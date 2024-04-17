@@ -1,0 +1,13 @@
+---
+
+# Installing utils
+- name: installing xfsdump
+  yum:
+    name: "xfsdump"
+    state: "present"
+
+# Installing utils
+- name: installing vim
+  yum:
+    name: "vim"
+    state: "present"

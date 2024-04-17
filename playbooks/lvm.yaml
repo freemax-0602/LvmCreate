@@ -1,0 +1,7 @@
+- hosts: lvm
+  remote_user: root
+  roles:
+    - roles/installing
+    - roles/create_tmp_lvm
+
+

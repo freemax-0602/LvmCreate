@@ -1,0 +1,155 @@
+---
+
+# Check new vg_root
+ - name: check vg
+   shell: "vgdisplay -v vg_root"
+   register: "vg_check"
+   changed_when: false
+   failed_when: false
+   check_mode: no
+
+ # Physical volume create
+ - name: create volume group
+   lvg:
+       vg: vg_root
+       pvs: /dev/sdb
+       state: present
+   when: vg_check.rc != 0
+
+ # Check logical volume 
+ - name: LVM | check lv
+   shell: "lvdisplay /dev/vg_root/lv_root"
+   register: "lv_check"
+   changed_when: false
+   failed_when: false
+   check_mode: no
+
+ # Create logical valume
+ - name: create logical volume
+   lvol:
+       vg: vg_root
+       lv: lv_root
+       force: yes
+       size: 100%FREE
+   when: lv_check.rc != 0
+
+ # Formating xfs filesystem
+ - name: format the xfs filesystem
+   filesystem:
+     fstype: xfs
+     dev: /dev/vg_root/lv_root
+
+ # Mounting logical volume
+ - name: mounting logical volume on /mnt
+   mount:
+     path: /mnt
+     src: /dev/vg_root/lv_root
+     fstype: xfs
+     state: mounted
+
+ # Check /mnt
+ - name: /mnt check
+   shell: "ls /mnt"
+   register: "check_mnt"
+   changed_when: false
+   failed_when: false
+   check_mode: no
+
+ # Copy / on /mnt
+ - name: copy / on /mnt
+   shell: "xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt" 
+   register: "xfdump_check"
+   when:
+         check_mnt.rc == 0
+
+  # Mounting partitions
+ - name: mounting partitions
+   shell: 
+         "for i in /proc/ /sys/ /dev/ /run/ /boot/; \
+          do mount --bind $i /mnt/$i; done"
+
+ - name: Chroot в новый /mnt
+   command: chroot /mnt/
+
+ - name: Обновление конфигурации GRUB
+   command: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+ - name: Обновление образа initrd
+   command: dracut -v "/boot/{{ item.stdout.split('-')[1] }}" "{{ item.stdout.split('-')[1] }}" --force
+   with_items: "{{ ansible_facts['lsboot']['initramfs'] }}"
+
+ - name: Удаление старого LV размером в 40G
+   command: lvremove /dev/VolGroup00/LogVol00
+
+ - name: Создание нового LV на 8G
+   command: lvcreate -n VolGroup00/LogVol00 -L 8G /dev/VolGroup00
+
+ - name: Создание файловой системы на новом LV и его монтировани
+   command: mkfs.xfs /dev/VolGroup00/LogVol00
+
+ - name: Монтирование нового LV
+   mount:
+     src: /dev/VolGroup00/LogVol00
+     path: /mnt
+     state: mounted
+ 
+ - name: Копирование данных с /mnt обратно на новый LV
+   command: xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt
+
+ - name: Повторная настройка GRUB
+   mount:
+     src: "{{ item }}"
+     dest: "/mnt{{ item }}"
+     state: bind
+     with_items:
+       - /proc/
+       - /sys/
+       - /dev/
+       - /run/
+       - /boot/
+
+ - name: Chroot в новый /mnt
+   command: chroot /mnt/
+
+ - name: Обновление конфигурации GRUB
+   command: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+ - name: Обновление образа initrd
+   command: dracut -v "/boot/{{ item.stdout.split('-')[1] }}" "{{ item.stdout.split('-')[1] }}" --force
+   with_items: "{{ ansible_facts['lsboot']['initramfs'] }}"
+
+  # Make grub2 config
+ - name: make grub2 config
+   ansible.builtin.command: 
+     cmd: grub2-mkconfig -o /boot/grub2/grub.cfg
+   register: "mkconfig_check"
+
+ #  # update initramf
+ # - name: LVM | update initramfs
+ #   ansible.builtin.shell:
+ #     chroot /mnt/ 
+ #     cd /boot ; for i in `ls initramfs-*img`; \
+ #     do dracut -v $i `echo $i|sed "s/initramfs-//g; \
+ #     > s/.img//g"` --force; done
+ # 
+ # # update grub2-file
+ # - name: update grub2 file
+ #   ansible.builtin.replace:
+ #    path: /boot/grub2/grub.cfg
+ #    regexp: 'rd.lvm.lv=VolGroup00/LogVol00'
+ #    replace: 'rd.lvm.lv=vg_root/lv_root'
+ #
+ #
+ #  # Physical volume create
+ # - name: create vg for mirror
+ #   lvg:
+ #       vg: vg_var
+ #       pvs: "{{ item }}"
+ #       state: present
+ #   loop:
+ #     - /dev/sdc
+ #     - /dev/sdd
+ #
+
+
+ 
