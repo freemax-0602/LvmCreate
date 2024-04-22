@@ -1,0 +1,54 @@
+- name: create /var/ parition
+  tags: var_mirror
+  block:
+    - name: Create volume group
+      lvg:
+          vg: vg_var
+          pvs: "{{ item }}"
+          state: present
+      loop:
+        - /dev/sdc
+        - /dev/sdd
+    
+    - name: Create logical volume
+      lvol:
+          vg: vg_var
+          lv: lv_var
+          force: yes
+          size: 950M
+
+    - name: Format the xfs filesystem
+      filesystem:
+        fstype: xfs
+        dev: /dev/vg_var/lv_var
+
+    - name: mounting logical volume on /mnt
+      mount:
+        path: /mnt
+        src: /dev/vg_var/lv_var
+        fstype: xfs
+        state: mounted
+
+    # Copy / on /mnt
+    - name: copy /var/ on /mnt
+      shell: "cp -aR /var/* /mnt/" 
+
+    - name: umount a /mnt
+      mount: 
+        path: /mnt
+        state: unmounted
+
+    - name: mounting logical volume on /mnt
+      mount:
+        path: /var
+        src: /dev/vg_var/lv_var
+        fstype: xfs
+        state: mounted
+
+    # Remove logical volume
+    - name: remove logical volume
+      lvol:
+          vg: vg_root
+          lv: lv_root
+          state: absent
+          force: true

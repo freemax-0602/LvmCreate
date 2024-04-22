@@ -1,0 +1,80 @@
+---
+- name: resize lvm
+  tags: resize
+  block:
+  
+    - name: Remove logical volume
+      lvol:
+          vg: VolGroup00
+          lv: LogVol00
+          state: absent
+          force: true
+
+    # Check new Volume group
+    - name: check vg
+      shell: "vgdisplay -v VolGroup00"
+      register: "vg_check"
+      changed_when: false
+      failed_when: false
+      check_mode: no
+
+    # Create new folume group
+    - name: create volume group
+      lvg:
+          vg: VolGroup00
+          pvs: /dev/sda3
+          state: present
+      when: vg_check.rc != 0
+
+    # Check logical volume 
+    - name: check lv
+      shell: "lvdisplay /dev/VolGroup00/LogVol00"
+      register: "lv_check"
+      changed_when: false
+      failed_when: false
+      check_mode: no
+
+    # Create new logical volume
+    - name: create logical volume
+      lvol:
+          vg: VolGroup00
+          lv: LogVol00
+          force: yes
+          size: 8g
+      when: lv_check.rc != 0
+
+    # Formating xfs filesystem
+    - name: format the xfs filesystem
+      filesystem:
+        fstype: xfs
+        dev: /dev/VolGroup00/LogVol00
+
+    # Mounting logical volume
+    - name: mounting logical volume on /mnt
+      mount:
+        path: /mnt
+        src: /dev/VolGroup00/LogVol00
+        fstype: xfs
+        state: mounted
+
+    # Check /mnt
+    - name: /mnt check
+      shell: "ls /mnt"
+      register: "check_mnt"
+      changed_when: false
+      failed_when: false
+      check_mode: no
+
+    # Copy / on /mnt
+    - name: copy / on /mnt
+      shell: "xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt" 
+      register: "xfdump_check"
+      when:
+          check_mnt.rc == 0
+
+    # Mounting partitions
+    - name: mounting partitions
+      shell: 
+            "for i in /proc/ /sys/ /dev/ /run/ /boot/; \
+            do mount --bind $i /mnt/$i; done"
+

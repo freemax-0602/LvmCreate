@@ -3,5 +3,6 @@
   roles:
     - roles/installing
     - roles/create_tmp_lvm
-
-
+    - roles/resize_lvm
+    - roles/var_mirror
+    - roles/home_part

@@ -1,62 +1,71 @@
 ---
+ - name: create tmp lvm
+   tags: create_tmp_lvm
+   block:
 
- # Check new vg_root
- - name: check vg
-   shell: "vgdisplay -v vg_root"
-   register: "vg_check"
-   changed_when: false
-   failed_when: false
-   check_mode: no
+  # Check new vg_root
+    - name: Check vg
+      shell: "vgdisplay -v vg_root"
+      register: "vg_check"
+      changed_when: false
+      failed_when: false
+      check_mode: no
 
- # Physical volume create
- - name: create volume group
-   lvg:
-       vg: vg_root
-       pvs: /dev/sdb
-       state: present
-   when: vg_check.rc != 0
+    # Physical volume create
+    - name: Create volume group
+      lvg:
+          vg: vg_root
+          pvs: /dev/sdb
+          state: present
+      when: vg_check.rc != 0
 
- # Check logical volume 
- - name: LVM | check lv
-   shell: "lvdisplay /dev/vg_root/lv_root"
-   register: "lv_check"
-   changed_when: false
-   failed_when: false
-   check_mode: no
+    # Check logical volume 
+    - name: Check lvc
+      shell: "lvdisplay /dev/vg_root/lv_root"
+      register: "lv_check"
+      changed_when: false
+      failed_when: false
+      check_mode: no
 
- # Create logical valume
- - name: LVM | create logical volume
-   lvol:
-       vg: vg_root
-       lv: lv_root
-       force: yes
-       size: 100%FREE
-   when: lv_check.rc != 0
+    # Create logical valume
+    - name: Create logical volume
+      lvol:
+          vg: vg_root
+          lv: lv_root
+          force: yes
+          size: 100%FREE
+      when: lv_check.rc != 0
 
- # Formating xfs filesystem
- - name: LVM | format the xfs filesystem
-   filesystem:
-     fstype: xfs
-     dev: /dev/vg_root/lv_root
+    # Formating xfs filesystem
+    - name: Format the xfs filesystem
+      filesystem:
+        fstype: xfs
+        dev: /dev/vg_root/lv_root
 
- # Mounting logical volume
- - name: mounting logical volume on /mnt
-   mount:
-     path: /mnt
-     src: /dev/vg_root/lv_root
-     fstype: xfs
-     state: mounted
+    # Mounting logical volume
+    - name: Mounting logical volume on /mnt
+      mount:
+        path: /mnt
+        src: /dev/vg_root/lv_root
+        fstype: xfs
+        state: mounted
 
- # Check /mnt
- - name: /mnt check
-   shell: "ls /mnt"
-   register: "check_mnt"
-   changed_when: false
-   failed_when: false
-   check_mode: no
+    # Check /mnt
+    - name: /mnt check
+      shell: "ls /mnt"
+      register: "check_mnt"
+      changed_when: false
+      failed_when: false
+      check_mode: no
 
- # Copy / on /mnt
- - name: copy / on /mnt
-   shell: "xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt" 
-   register: "xfdump_check"
+    # Copy / on /mnt
+    - name: Copy / on /mnt
+      shell: "xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt" 
+      register: "xfdump_check"
+
+    # Mounting partitions
+    - name: Mounting partitions
+      shell: "for i in /proc/ /sys/ /dev/ /run/ /boot/; \
+            do mount --bind $i /mnt/$i; done"  
+
 

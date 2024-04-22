@@ -1,0 +1,38 @@
+ 
+- name: create home partitions
+  tags: create_home_part
+  block:
+    - name: Create logical volume
+      lvol:
+          vg: VolGroup00
+          lv: LogVol_Home
+          force: yes
+          size: 2G
+
+    - name: Format the xfs filesystem
+      filesystem:
+        fstype: xfs
+        dev: /dev/VolGroup00/LogVol_Home
+
+    - name: mounting logical volume on /mnt
+      mount:
+        path: /mnt
+        src: /dev/VolGroup00/LogVol_Home
+        fstype: xfs
+        state: mounted
+
+    # Copy / on /mnt
+    - name: copy /home/ on /mnt
+      shell: "cp -aR /home/* /mnt/" 
+
+    - name: umount a /mnt
+      mount: 
+        path: /mnt
+        state: unmounted
+
+    - name: mounting logical volume on /mnt
+      mount:
+        path: /home/
+        src: /dev/VolGroup00/LogVol_Home
+        fstype: xfs
+        state: mounted

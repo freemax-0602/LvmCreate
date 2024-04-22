@@ -1,13 +1,13 @@
 ---
 
 # Installing utils
-- name: installing xfsdump
-  yum:
-    name: "xfsdump"
-    state: "present"
-
-# Installing utils
-- name: installing vim
-  yum:
-    name: "vim"
-    state: "present"
+- name: installing task
+  tags: installing
+  block:
+    - name: installing xfsdump
+      yum:
+        name: "{{ item }}"
+        state: "present"
+      loop:
+        - xfsdump
+        - vim
